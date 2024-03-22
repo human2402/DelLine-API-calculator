@@ -1,0 +1,249 @@
+﻿@* @{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="text-center">
+    <h1 id="getG"></h1>
+    <h1 class="display-4">Welcome</h1>
+    <input type = "text" id="cities" />
+    <input type = "button" onclick="SubmitQ()" />
+    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+</div>
+<script> 
+    function SubmitQ () {
+        const urlc = "/Home/FetchTry";
+        const firstname = document.getElementById("cities").value;
+        // const firstname = $.("cities").value;
+        console.log(firstname);
+        const secondname = "Mal";
+
+        $.ajax({
+            url: urlc,
+            method: "POST",
+            data: { searchQ: firstname },
+            success: function (data) {
+                alert(data);
+                console.log (data)
+            }, 
+            error: function (err) {
+                alert("falure");
+                console.error(err);
+            }
+        })
+
+    //     $.get(url, { firstname, secondname }, function (data) {
+    //         $("getG").html(data);
+    //     })
+    // })
+    }
+    
+</script> *@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autocomplete with AJAX</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <style>
+        #dropdownContainer {
+            
+        }
+
+        #optionsList {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 5px;
+            width: 200px;
+            position: relative;
+            overflow: auto; /* Add scrollbar */
+            max-height: 160px; /* Set maximum height */
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            width: 70%;
+        }
+
+        #optionsList li {
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        #priceBox{
+            display: none;
+        }
+
+
+
+        #searchInput, #depCity {
+            width: 70%;
+        }
+        .padd {
+            height: 10px
+        }
+    </style>
+
+    <script>
+        let selectedCityIDState = null;
+
+        $(document).ready(function () 
+        {
+            $('#searchInput').on('input', function () 
+            {
+                var firstname = $(this).val();
+                var urlc = "/Home/FetchTry";
+                $.ajax({
+                    url: urlc,
+                    method: "POST",
+                    data: { searchQ: firstname },
+                    success: function (data) {
+                        var optionsArray = [];
+                        try {
+                            // Parse the JSON response
+                            optionsArray = JSON.parse(data)["cities"];
+                            console.log(optionsArray)
+                            displayOptions(optionsArray);
+                        } catch (error) {
+                            console.error("Error parsing JSON:", error);
+                        }
+                    },
+                    error: function (err) {
+                        console.error(err);
+                        alert("Failure");
+                    }
+                });
+            });
+
+            function displayOptions(options) 
+            {
+                var optionList = $('#optionsList');
+                optionList.empty(); // Clear previous options
+                $.each(options, function (index, option) {
+                    var listItem = $('<li>').text(option.aString); // Assuming each option has a 'name' property
+                    listItem.attr('data-id', option.cityID); // Assuming each option has an 'id' property
+                    listItem.on('click', function () {
+                        var selectedId = $(this).data('id');
+                        optionList.empty(); // Clear previous options
+                        selectedCityIDState = selectedId;
+                        console.log("Selected ID: " + selectedCityIDState);
+                        console.log();
+                        $('#searchInput').val(option.aString);
+                        calculateDelivery(selectedId);
+                    });
+                    listItem.appendTo(optionList);
+                });
+            }
+
+            function calculateDelivery(_cityID){
+                let errDisplay = document.getElementById("errDisplay")
+                errDisplay.innerHTML = ""
+                var urlc = "/Home/FetchCalculator";
+                let statDisp = document.getElementById("statusDisplay");
+                statDisp.innerHTML = "Загрузка";
+                statDisp.style.color = "#7a7a7a"
+                $.ajax({
+                    url: urlc,
+                    method: "POST",
+                    data: { cityID: _cityID },
+                    success: function (data) {
+                        var optionsArray = [];
+                        // try {
+                            // Parse the JSON response
+                        let resArray = "";
+                            resArray = JSON.parse(data);
+                  
+                            console.log(resArray)
+                            resStatus = resArray.metadata.status;
+                            if (resStatus  == 200){
+                                statDisp.innerHTML = "Маршрут: " + resArray.data.derival.terminal + " - " + resArray.data.arrival.terminal;
+                                statDisp.style.color = "#124d00"
+                                displayPrices(resArray);
+                            } else {
+                                document.getElementById("priceBox").style.display = "none";
+                                statDisp.innerHTML = resArray.errors[0].title;
+                                statDisp.style.color = "#747200"
+                                errDisplay.innerHTML = resArray.errors[0].detail
+                            }
+                        // } catch (error) {
+                        //     statDisp.innerHTML = resArr.errors[0].title;
+                        //     statDisp.style.color = "#747200"
+                        //     errDisplay.innerHTML = resArr.errors[0].detail
+                        // }
+                    },
+                    error: function (err) {
+                        console.error(err);
+                        alert("Failure");
+                    }
+                });
+            }
+
+            function displayPrices(ar) {
+                var date1 = new Date(ar.data.orderDates.arrivalToOspReceiver);
+                var date2 = new Date(ar.data.orderDates.arrivalToOspSender);
+
+                var differenceInMilliseconds = date1 - date2;
+                var differenceInDays = Math.floor((date1 - date2) / (1000 * 60 * 60 * 24));
+
+                let aviaPrice = ar.data.availableDeliveryTypes.avia;
+
+                document.getElementById("priceBox").style.display = "block";
+                document.getElementById("directPriceAuto").innerHTML = ar.data.price;
+                document.getElementById("directPriceAvia").innerHTML = aviaPrice == undefined ? "--" : aviaPrice;
+                document.getElementById("directTerm").innerHTML = differenceInDays;
+            }
+
+
+        });
+    </script>
+</head>
+<body>
+
+    <h2>Посылка деловыми линиями</h2>
+    <div class="padd"></div>
+    <label for="depCity">Город отправки:</label>
+    <br /> <div class="padd"></div>
+    <input type="text" id="depCity" name="name" value="Чита г (Забайкальский край)" disabled=" True" />
+    <br />
+    <div class="padd"></div>
+    <div class="padd"></div>
+    <label for="searchInput">Город назначения:</label>
+    <br />
+    <div class="padd"></div>
+    <input type="text" id="searchInput" placeholder="Type here...">
+    <ul id="optionsList"></ul>
+    <div class="padd"></div>
+    <div class="padd"></div>
+
+    <h3 id = "statusDisplay"></h3>
+    <h6 id = "errDisplay"></h6>
+    <div class="padd"></div>
+    <div id="priceBox">
+        <table id="deliveryTable" border="1">
+            <thead>
+                <tr>
+                    <th id="routeDisplay"></th>
+                </tr> <tr >
+                    <th>ТК Деловые линии</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Цена "авто"</td>
+                    <td id="directPriceAuto"></td>
+                </tr>
+                <tr>
+                    <td>Цена "авиа"</td>
+                    <td id="directPriceAvia"></td>
+                </tr>
+                <tr>
+                    <td>Макс. срок</td>
+                    <td id="directTerm"></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div id="indirectDelivery"></div>
+    </div>
+</body>
+</html>
